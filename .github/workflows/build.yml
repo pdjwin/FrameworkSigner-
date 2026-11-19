@@ -1,0 +1,83 @@
+name: FrameworkSigner iOS Build
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS IPA
+
+    runs-on: macos-15
+
+    timeout-minutes: 40
+
+    steps:
+
+      # 1. 소스코드 가져오기
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Xcode 확인
+      - name: Check Xcode
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # 3. XcodeGen 설치
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      # 4. Xcode 프로젝트 생성
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+
+      # 5. 의존성 확인
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project FrameworkSigner.xcodeproj \
+            -scheme FrameworkSigner
+
+      # 6. iOS 앱 빌드
+      - name: Build FrameworkSigner
+        run: |
+          xcodebuild \
+            -project FrameworkSigner.xcodeproj \
+            -scheme FrameworkSigner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      # 7. IPA 패키징
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+
+          cp -R \
+            build/Build/Products/Release-iphoneos/FrameworkSigner.app \
+            Payload/
+
+          ditto -c -k --sequesterRsrc Payload FrameworkSigner-unsigned.ipa
+
+      # 8. IPA 업로드
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+
+        with:
+          name: FrameworkSigner-unsigned-IPA
+          path: FrameworkSigner-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
