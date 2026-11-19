@@ -1,0 +1,33 @@
+
+name: FrameworkSigner
+
+options:
+  bundleIdPrefix: com.pdjwin
+  deploymentTarget:
+    iOS: "15.0"
+
+packages:
+  RorkSign:
+    url: https://github.com/rorkai/rork-sign.git
+    from: 0.6.5
+
+targets:
+  FrameworkSigner:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: RorkSign
+        product: RorkSign
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pdjwin.frameworksigner
+        PRODUCT_NAME: FrameworkSigner
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: FrameworkSigner
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        CODE_SIGNING_ALLOWED: NO
