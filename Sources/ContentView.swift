@@ -9,7 +9,9 @@ enum SignerPage: String, CaseIterable, Identifiable {
     case signing = "서명 실행"
     case logs = "작업 로그"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var icon: String {
 
@@ -57,14 +59,14 @@ struct ContentView: View {
         "NX2Apple Signer 준비 완료"
     ]
 
-    @State private var currentFile = ""
-    @State private var progressText = ""
-
+    @State private var currentFile = "대기 중"
+    @State private var progressText = "작업 대기 중"
     @State private var progressValue = 0.0
 
     @State private var successCount = 0
     @State private var failedCount = 0
     @State private var skippedCount = 0
+    @State private var replacedCount = 0
 
     var body: some View {
 
@@ -77,7 +79,10 @@ struct ContentView: View {
                 Divider()
 
                 detailContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
             }
             .navigationBarHidden(true)
         }
@@ -90,7 +95,10 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
 
-            handleFolderSelection(result, isSource: true)
+            handleFolderSelection(
+                result,
+                isSource: true
+            )
         }
 
         .fileImporter(
@@ -99,7 +107,10 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
 
-            handleFolderSelection(result, isSource: false)
+            handleFolderSelection(
+                result,
+                isSource: false
+            )
         }
 
         .fileImporter(
@@ -108,7 +119,10 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
 
-            handleFileSelection(result, isProfile: true)
+            handleFileSelection(
+                result,
+                isProfile: true
+            )
         }
 
         .fileImporter(
@@ -117,7 +131,10 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
 
-            handleFileSelection(result, isProfile: false)
+            handleFileSelection(
+                result,
+                isProfile: false
+            )
         }
     }
 
@@ -172,7 +189,7 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.horizontal, 7)
-        .frame(width: 160)
+        .frame(width: 150)
         .background(
             Color(uiColor: .secondarySystemGroupedBackground)
         )
@@ -221,8 +238,10 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 13) {
 
-                Text("서명할 Framework가 포함된 원본 폴더입니다.")
-                    .foregroundColor(.secondary)
+                Text(
+                    "서명할 Framework가 포함된 원본 폴더입니다."
+                )
+                .foregroundColor(.secondary)
 
                 pathLabel(sourceURL)
 
@@ -239,8 +258,12 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isSigning)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
 
         } label: {
 
@@ -259,8 +282,10 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 13) {
 
-                Text("서명이 완료된 Framework를 저장할 위치입니다.")
-                    .foregroundColor(.secondary)
+                Text(
+                    "서명이 완료된 Framework를 저장할 위치입니다."
+                )
+                .foregroundColor(.secondary)
 
                 pathLabel(destinationURL)
 
@@ -277,8 +302,8 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isSigning)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
         } label: {
 
@@ -355,6 +380,7 @@ struct ContentView: View {
                     "실패한 작업용 복사본 자동 삭제",
                     isOn: $deleteFailedCopies
                 )
+                .disabled(isSigning)
 
                 HStack {
 
@@ -375,6 +401,12 @@ struct ContentView: View {
                         value: skippedCount,
                         color: .secondary
                     )
+
+                    resultItem(
+                        title: "교체",
+                        value: replacedCount,
+                        color: .blue
+                    )
                 }
 
                 Divider()
@@ -382,13 +414,14 @@ struct ContentView: View {
                 Text("현재 처리 파일")
                     .font(.subheadline.bold())
 
-                Text(
-                    currentFile.isEmpty
-                    ? "대기 중"
-                    : currentFile
-                )
-                .font(.system(size: 12, design: .monospaced))
-                .textSelection(.enabled)
+                Text(currentFile)
+                    .font(
+                        .system(
+                            size: 12,
+                            design: .monospaced
+                        )
+                    )
+                    .textSelection(.enabled)
 
                 Text(progressText)
                     .font(.caption)
@@ -403,19 +436,25 @@ struct ContentView: View {
                 } label: {
 
                     Label(
-                        isSigning ? "작업 진행 중..." : "서명 시작",
+                        isSigning
+                        ? "작업 진행 중..."
+                        : "서명 시작",
                         systemImage: "checkmark.shield"
                     )
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSigning || !canStartSigning)
+                .disabled(
+                    isSigning || !canStartSigning
+                )
 
                 if !canStartSigning && !isSigning {
 
-                    Text("원본, 저장 위치, 인증서, 프로파일 및 Bundle ID를 확인해 주세요.")
-                        .font(.caption)
-                        .foregroundColor(.orange)
+                    Text(
+                        "원본, 저장 위치, 인증서, 프로파일 및 Bundle ID를 확인해 주세요."
+                    )
+                    .font(.caption)
+                    .foregroundColor(.orange)
                 }
 
                 if isSigning {
@@ -458,7 +497,10 @@ struct ContentView: View {
 
                 ScrollView {
 
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
 
                         ForEach(
                             Array(logs.enumerated()),
@@ -494,7 +536,9 @@ struct ContentView: View {
 
     // MARK: Components
 
-    private func pathLabel(_ url: URL?) -> some View {
+    private func pathLabel(
+        _ url: URL?
+    ) -> some View {
 
         HStack {
 
@@ -553,6 +597,7 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isSigning)
     }
 
     private func resultItem(
@@ -571,7 +616,10 @@ struct ContentView: View {
                 .font(.title2.bold())
                 .foregroundColor(color)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
         .padding(10)
         .background(
             Color(uiColor: .tertiarySystemGroupedBackground)
@@ -589,9 +637,11 @@ struct ContentView: View {
         destinationURL != nil &&
         profileURL != nil &&
         p12URL != nil &&
-        !hostBundleIdentifier.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty &&
+        !hostBundleIdentifier
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
         !password.isEmpty
     }
 
@@ -613,17 +663,25 @@ struct ContentView: View {
             if isSource {
 
                 sourceURL = url
-                addLog("원본 폴더 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "원본 폴더 선택: \(url.lastPathComponent)"
+                )
 
             } else {
 
                 destinationURL = url
-                addLog("저장 위치 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "저장 위치 선택: \(url.lastPathComponent)"
+                )
             }
 
         case .failure(let error):
 
-            addLog("폴더 선택 실패: \(error.localizedDescription)")
+            addLog(
+                "폴더 선택 실패: \(error.localizedDescription)"
+            )
         }
     }
 
@@ -645,17 +703,25 @@ struct ContentView: View {
             if isProfile {
 
                 profileURL = url
-                addLog("프로파일 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "프로파일 선택: \(url.lastPathComponent)"
+                )
 
             } else {
 
                 p12URL = url
-                addLog("P12 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "P12 선택: \(url.lastPathComponent)"
+                )
             }
 
         case .failure(let error):
 
-            addLog("파일 선택 실패: \(error.localizedDescription)")
+            addLog(
+                "파일 선택 실패: \(error.localizedDescription)"
+            )
         }
     }
 
@@ -675,9 +741,11 @@ struct ContentView: View {
         isSigning = true
 
         progressValue = 0
+
         successCount = 0
         failedCount = 0
         skippedCount = 0
+        replacedCount = 0
 
         currentFile = "작업 준비 중"
         progressText = "인증서 검증 중"
@@ -688,7 +756,9 @@ struct ContentView: View {
 
         addLog("서명 작업 시작")
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(
+            qos: .userInitiated
+        ).async {
 
             do {
 
@@ -704,32 +774,7 @@ struct ContentView: View {
 
                     DispatchQueue.main.async {
 
-                        addLog(message)
-
-                        if message.hasPrefix("FILE:") {
-
-                            currentFile = String(
-                                message.dropFirst(5)
-                            )
-                        }
-
-                        if message.hasPrefix("PROGRESS:") {
-
-                            let values = message
-                                .dropFirst(9)
-                                .split(separator: "/")
-
-                            if values.count == 2,
-                               let done = Double(values[0]),
-                               let total = Double(values[1]),
-                               total > 0 {
-
-                                progressValue = done / total
-
-                                progressText =
-                                    "\(Int(done))/\(Int(total))"
-                            }
-                        }
+                        handleProgressMessage(message)
                     }
                 }
 
@@ -738,8 +783,10 @@ struct ContentView: View {
                     successCount = result.success.count
                     failedCount = result.failed.count
                     skippedCount = result.skipped.count
+                    replacedCount = result.replaced.count
 
                     progressValue = 1
+
                     currentFile = "작업 완료"
                     progressText = "전체 작업 완료"
 
@@ -753,7 +800,9 @@ struct ContentView: View {
                 DispatchQueue.main.async {
 
                     currentFile = "작업 실패"
-                    progressText = error.localizedDescription
+
+                    progressText =
+                        error.localizedDescription
 
                     addLog(
                         "오류: \(error.localizedDescription)"
@@ -765,11 +814,30 @@ struct ContentView: View {
         }
     }
 
+    // MARK: Progress
+
+    private func handleProgressMessage(
+        _ message: String
+    ) {
+
+        addLog(message)
+
+        if message.hasPrefix("FILE:") {
+
+            currentFile = String(
+                message.dropFirst(5)
+            )
+        }
+    }
+
     // MARK: Log
 
-    private func addLog(_ message: String) {
+    private func addLog(
+        _ message: String
+    ) {
 
         let formatter = DateFormatter()
+
         formatter.dateFormat = "HH:mm:ss"
 
         logs.append(
