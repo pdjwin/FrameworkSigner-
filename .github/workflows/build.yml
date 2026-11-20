@@ -2,6 +2,7 @@ name: NX2Apple Signer Build
 
 on:
   workflow_dispatch:
+
   push:
     branches:
       - main
@@ -14,37 +15,44 @@ permissions:
   contents: read
 
 jobs:
+
   build:
+
     name: Build unsigned iOS IPA
+
     runs-on: xcode-27
 
     steps:
+
       - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Select Xcode 27.2
         run: |
+
           sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
-          echo "=== Xcode Version ==="
+
           xcodebuild -version
 
-          echo "=== Available iOS SDK ==="
           xcodebuild -showsdks
 
-          echo "=== Verify iOS 27.2 SDK ==="
           xcodebuild -version -sdk iphoneos27.2
 
       - name: Install XcodeGen
         run: |
+
           brew install xcodegen
+
           xcodegen --version
 
       - name: Generate Xcode project
         run: |
+
           xcodegen generate --spec project.yml
 
       - name: Resolve Swift packages
         run: |
+
           xcodebuild \
             -resolvePackageDependencies \
             -project NX2AppleSigner.xcodeproj \
@@ -52,7 +60,9 @@ jobs:
 
       - name: Build iOS application
         run: |
+
           set -o pipefail
+
           xcodebuild \
             -project NX2AppleSigner.xcodeproj \
             -scheme NX2AppleSigner \
@@ -67,26 +77,42 @@ jobs:
 
       - name: Verify application
         run: |
+
           set -e
+
           APP_PATH="build/Build/Products/Release-iphoneos/NX2AppleSigner.app"
 
           test -d "$APP_PATH"
+
           test -f "$APP_PATH/Info.plist"
 
-          echo "Application build verified."
+          echo "Checking Files integration..."
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :UIFileSharingEnabled" \
+            "$APP_PATH/Info.plist"
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :LSSupportsOpeningDocumentsInPlace" \
+            "$APP_PATH/Info.plist"
+
+          echo "Application verified."
 
       - name: Package IPA
         run: |
+
           set -e
 
           APP_PATH="build/Build/Products/Release-iphoneos/NX2AppleSigner.app"
 
           rm -rf Payload
+
           mkdir -p Payload
 
           cp -R "$APP_PATH" Payload/NX2AppleSigner.app
 
           zip -r -X NX2AppleSigner-unsigned.ipa Payload
+
           unzip -Z1 NX2AppleSigner-unsigned.ipa \
             | grep -q '^Payload/NX2AppleSigner.app/Info.plist$'
 
@@ -94,17 +120,28 @@ jobs:
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
+
         with:
+
           name: NX2AppleSigner-unsigned-IPA
+
           path: NX2AppleSigner-unsigned.ipa
+
           if-no-files-found: error
+
           retention-days: 14
 
       - name: Upload build log
         if: always()
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: NX2AppleSigner-build-log
+
           path: build.log
+
           if-no-files-found: ignore
+
           retention-days: 7
