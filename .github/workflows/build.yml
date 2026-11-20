@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      name: NX2Apple Signer Build
 
 concurrency:
   group: nx2apple-signer-build
@@ -26,7 +25,6 @@ jobs:
       - name: Select Xcode 27.2
         run: |
           sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
-
           echo "=== Xcode Version ==="
           xcodebuild -version
 
@@ -55,7 +53,6 @@ jobs:
       - name: Build iOS application
         run: |
           set -o pipefail
-
           xcodebuild \
             -project NX2AppleSigner.xcodeproj \
             -scheme NX2AppleSigner \
@@ -71,7 +68,6 @@ jobs:
       - name: Verify application
         run: |
           set -e
-
           APP_PATH="build/Build/Products/Release-iphoneos/NX2AppleSigner.app"
 
           test -d "$APP_PATH"
@@ -91,7 +87,6 @@ jobs:
           cp -R "$APP_PATH" Payload/NX2AppleSigner.app
 
           zip -r -X NX2AppleSigner-unsigned.ipa Payload
-
           unzip -Z1 NX2AppleSigner-unsigned.ipa \
             | grep -q '^Payload/NX2AppleSigner.app/Info.plist$'
 
