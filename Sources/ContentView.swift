@@ -1,9 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Menu
-
 enum SignerPage: String, CaseIterable, Identifiable {
+
     case source = "Framework"
     case destination = "저장 위치"
     case certificate = "인증서"
@@ -13,28 +12,30 @@ enum SignerPage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var icon: String {
+
         switch self {
+
         case .source:
             return "shippingbox"
+
         case .destination:
             return "folder.badge.checkmark"
+
         case .certificate:
             return "key.horizontal"
+
         case .signing:
             return "signature"
+
         case .logs:
             return "terminal"
         }
     }
 }
 
-// MARK: - ContentView
-
 struct ContentView: View {
 
-    // MARK: State
-
-    @State private var selectedPage: SignerPage? = .source
+    @State private var selectedPage: SignerPage = .source
 
     @State private var sourceURL: URL?
     @State private var destinationURL: URL?
@@ -56,10 +57,14 @@ struct ContentView: View {
         "NX2Apple Signer 준비 완료"
     ]
 
+    @State private var currentFile = ""
+    @State private var progressText = ""
+
+    @State private var progressValue = 0.0
+
     @State private var successCount = 0
     @State private var failedCount = 0
-
-    // MARK: Main View
+    @State private var skippedCount = 0
 
     var body: some View {
 
@@ -67,66 +72,9 @@ struct ContentView: View {
 
             HStack(spacing: 0) {
 
-                // 왼쪽 메뉴
-
-                VStack(alignment: .leading, spacing: 6) {
-
-                    Text("NX2Apple")
-                        .font(.title3.weight(.bold))
-                        .padding(.horizontal, 12)
-                        .padding(.top, 18)
-                        .padding(.bottom, 12)
-
-                    ForEach(SignerPage.allCases) { page in
-
-                        Button {
-
-                            selectedPage = page
-
-                        } label: {
-
-                            HStack(spacing: 11) {
-
-                                Image(systemName: page.icon)
-                                    .font(.system(size: 17))
-                                    .frame(width: 24)
-
-                                Text(page.rawValue)
-                                    .font(.system(size: 14, weight: .medium))
-
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 11)
-                            .padding(.vertical, 13)
-                            .foregroundColor(
-                                selectedPage == page
-                                ? .blue
-                                : .primary
-                            )
-                            .background(
-                                selectedPage == page
-                                ? Color.blue.opacity(0.13)
-                                : Color.clear
-                            )
-                            .clipShape(
-                                RoundedRectangle(cornerRadius: 9)
-                            )
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Spacer()
-                }
-                .padding(.horizontal, 7)
-                .frame(width: 165)
-                .background(
-                    Color(uiColor: .secondarySystemGroupedBackground)
-                )
+                sidebar
 
                 Divider()
-
-                // 오른쪽 콘텐츠
 
                 detailContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -135,8 +83,6 @@ struct ContentView: View {
         }
         .navigationViewStyle(.stack)
         .tint(.blue)
-
-        // MARK: File Importers
 
         .fileImporter(
             isPresented: $showingSourcePicker,
@@ -175,15 +121,72 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Detail Content
+    // MARK: Sidebar
+
+    private var sidebar: some View {
+
+        VStack(alignment: .leading, spacing: 7) {
+
+            Text("NX2Apple")
+                .font(.title3.bold())
+                .padding(.horizontal, 12)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+
+            ForEach(SignerPage.allCases) { page in
+
+                Button {
+
+                    selectedPage = page
+
+                } label: {
+
+                    HStack(spacing: 10) {
+
+                        Image(systemName: page.icon)
+                            .frame(width: 23)
+
+                        Text(page.rawValue)
+                            .font(.system(size: 14))
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 13)
+                    .foregroundColor(
+                        selectedPage == page ? .blue : .primary
+                    )
+                    .background(
+                        selectedPage == page
+                        ? Color.blue.opacity(0.13)
+                        : Color.clear
+                    )
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 9)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 7)
+        .frame(width: 160)
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground)
+        )
+    }
+
+    // MARK: Detail
 
     private var detailContent: some View {
 
         ScrollView {
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 15) {
 
-                switch selectedPage ?? .source {
+                switch selectedPage {
 
                 case .source:
                     sourceSection
@@ -210,17 +213,16 @@ struct ContentView: View {
         )
     }
 
-    // MARK: Framework
+    // MARK: Source
 
     private var sourceSection: some View {
 
         GroupBox {
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 13) {
 
-                Text("서명할 Framework가 포함된 폴더를 선택합니다.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text("서명할 Framework가 포함된 원본 폴더입니다.")
+                    .foregroundColor(.secondary)
 
                 pathLabel(sourceURL)
 
@@ -234,6 +236,7 @@ struct ContentView: View {
                         "원본 폴더 선택",
                         systemImage: "folder"
                     )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -245,7 +248,6 @@ struct ContentView: View {
                 "원본 Framework",
                 systemImage: "shippingbox"
             )
-            .font(.headline)
         }
     }
 
@@ -255,11 +257,10 @@ struct ContentView: View {
 
         GroupBox {
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 13) {
 
                 Text("서명이 완료된 Framework를 저장할 위치입니다.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.secondary)
 
                 pathLabel(destinationURL)
 
@@ -273,6 +274,7 @@ struct ContentView: View {
                         "저장 폴더 선택",
                         systemImage: "folder.badge.plus"
                     )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -284,7 +286,6 @@ struct ContentView: View {
                 "저장 위치",
                 systemImage: "folder.badge.checkmark"
             )
-            .font(.headline)
         }
     }
 
@@ -323,7 +324,6 @@ struct ContentView: View {
                 Divider()
 
                 Text("Host Bundle Identifier")
-                    .font(.subheadline.weight(.medium))
 
                 TextField(
                     "호스트 앱 Bundle ID",
@@ -333,7 +333,6 @@ struct ContentView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
         } label: {
 
@@ -341,7 +340,6 @@ struct ContentView: View {
                 "인증서 설정",
                 systemImage: "key.horizontal"
             )
-            .font(.headline)
         }
     }
 
@@ -351,14 +349,14 @@ struct ContentView: View {
 
         GroupBox {
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 15) {
 
                 Toggle(
                     "실패한 작업용 복사본 자동 삭제",
                     isOn: $deleteFailedCopies
                 )
 
-                HStack(spacing: 12) {
+                HStack {
 
                     resultItem(
                         title: "성공",
@@ -371,7 +369,32 @@ struct ContentView: View {
                         value: failedCount,
                         color: .red
                     )
+
+                    resultItem(
+                        title: "스킵",
+                        value: skippedCount,
+                        color: .secondary
+                    )
                 }
+
+                Divider()
+
+                Text("현재 처리 파일")
+                    .font(.subheadline.bold())
+
+                Text(
+                    currentFile.isEmpty
+                    ? "대기 중"
+                    : currentFile
+                )
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
+
+                Text(progressText)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                ProgressView(value: progressValue)
 
                 Button {
 
@@ -380,9 +403,7 @@ struct ContentView: View {
                 } label: {
 
                     Label(
-                        isSigning
-                        ? "서명 진행 중..."
-                        : "Framework 서명 시작",
+                        isSigning ? "작업 진행 중..." : "서명 시작",
                         systemImage: "checkmark.shield"
                     )
                     .frame(maxWidth: .infinity)
@@ -390,13 +411,18 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(isSigning || !canStartSigning)
 
+                if !canStartSigning && !isSigning {
+
+                    Text("원본, 저장 위치, 인증서, 프로파일 및 Bundle ID를 확인해 주세요.")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+
                 if isSigning {
 
                     ProgressView()
-                        .frame(maxWidth: .infinity)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
         } label: {
 
@@ -404,7 +430,6 @@ struct ContentView: View {
                 "서명 실행",
                 systemImage: "signature"
             )
-            .font(.headline)
         }
     }
 
@@ -414,31 +439,49 @@ struct ContentView: View {
 
         GroupBox {
 
-            ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
 
-                VStack(alignment: .leading, spacing: 7) {
+                HStack {
 
-                    ForEach(
-                        Array(logs.enumerated()),
-                        id: \.offset
-                    ) { _, log in
+                    Text("작업 기록")
 
-                        Text(log)
-                            .font(
-                                .system(
-                                    size: 12,
-                                    design: .monospaced
+                    Spacer()
+
+                    Button("로그 지우기") {
+
+                        logs.removeAll()
+                    }
+                    .disabled(isSigning)
+                }
+
+                Divider()
+
+                ScrollView {
+
+                    VStack(alignment: .leading, spacing: 7) {
+
+                        ForEach(
+                            Array(logs.enumerated()),
+                            id: \.offset
+                        ) { _, line in
+
+                            Text(line)
+                                .font(
+                                    .system(
+                                        size: 12,
+                                        design: .monospaced
+                                    )
                                 )
-                            )
-                            .textSelection(.enabled)
-                            .frame(
-                                maxWidth: .infinity,
-                                alignment: .leading
-                            )
+                                .textSelection(.enabled)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                        }
                     }
                 }
+                .frame(minHeight: 250)
             }
-            .frame(minHeight: 180, maxHeight: 450)
 
         } label: {
 
@@ -446,37 +489,33 @@ struct ContentView: View {
                 "작업 로그",
                 systemImage: "terminal"
             )
-            .font(.headline)
         }
     }
 
-    // MARK: Path Label
+    // MARK: Components
 
     private func pathLabel(_ url: URL?) -> some View {
 
         HStack {
 
             Image(systemName: "folder")
-                .foregroundStyle(.secondary)
+                .foregroundColor(.secondary)
 
             Text(
                 url?.lastPathComponent ?? "선택된 폴더 없음"
             )
-            .font(.subheadline)
             .lineLimit(2)
 
             Spacer()
         }
-        .padding(10)
+        .padding(11)
         .background(
             Color(uiColor: .tertiarySystemGroupedBackground)
         )
         .clipShape(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 9)
         )
     }
-
-    // MARK: File Selection Row
 
     private func fileSelectionRow(
         title: String,
@@ -488,16 +527,15 @@ struct ContentView: View {
 
             HStack {
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
 
                     Text(title)
-                        .font(.subheadline.weight(.medium))
 
                     Text(
                         filename ?? "파일을 선택해 주세요"
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.secondary)
                     .lineLimit(1)
                 }
 
@@ -509,9 +547,7 @@ struct ContentView: View {
                     : "checkmark.circle.fill"
                 )
                 .foregroundColor(
-                    filename == nil
-                    ? .secondary
-                    : .green
+                    filename == nil ? .secondary : .green
                 )
             }
             .contentShape(Rectangle())
@@ -519,31 +555,29 @@ struct ContentView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Result Item
-
     private func resultItem(
         title: String,
         value: Int,
         color: Color
     ) -> some View {
 
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
 
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundColor(.secondary)
 
             Text("\(value)")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(color)
+                .font(.title2.bold())
+                .foregroundColor(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(10)
         .background(
             Color(uiColor: .tertiarySystemGroupedBackground)
         )
         .clipShape(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 9)
         )
     }
 
@@ -555,7 +589,9 @@ struct ContentView: View {
         destinationURL != nil &&
         profileURL != nil &&
         p12URL != nil &&
-        !hostBundleIdentifier.isEmpty &&
+        !hostBundleIdentifier.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty &&
         !password.isEmpty
     }
 
@@ -577,25 +613,17 @@ struct ContentView: View {
             if isSource {
 
                 sourceURL = url
-
-                addLog(
-                    "원본 폴더 선택: \(url.lastPathComponent)"
-                )
+                addLog("원본 폴더 선택: \(url.lastPathComponent)")
 
             } else {
 
                 destinationURL = url
-
-                addLog(
-                    "저장 폴더 선택: \(url.lastPathComponent)"
-                )
+                addLog("저장 위치 선택: \(url.lastPathComponent)")
             }
 
         case .failure(let error):
 
-            addLog(
-                "폴더 선택 실패: \(error.localizedDescription)"
-            )
+            addLog("폴더 선택 실패: \(error.localizedDescription)")
         }
     }
 
@@ -617,19 +645,17 @@ struct ContentView: View {
             if isProfile {
 
                 profileURL = url
-                addLog("프로파일 선택 완료")
+                addLog("프로파일 선택: \(url.lastPathComponent)")
 
             } else {
 
                 p12URL = url
-                addLog("P12 인증서 선택 완료")
+                addLog("P12 선택: \(url.lastPathComponent)")
             }
 
         case .failure(let error):
 
-            addLog(
-                "파일 선택 실패: \(error.localizedDescription)"
-            )
+            addLog("파일 선택 실패: \(error.localizedDescription)")
         }
     }
 
@@ -648,14 +674,19 @@ struct ContentView: View {
 
         isSigning = true
 
+        progressValue = 0
         successCount = 0
         failedCount = 0
+        skippedCount = 0
 
-        addLog("서명 작업 시작")
+        currentFile = "작업 준비 중"
+        progressText = "인증서 검증 중"
 
         let currentPassword = password
         let currentBundleID = hostBundleIdentifier
         let shouldDelete = deleteFailedCopies
+
+        addLog("서명 작업 시작")
 
         DispatchQueue.global(qos: .userInitiated).async {
 
@@ -674,6 +705,31 @@ struct ContentView: View {
                     DispatchQueue.main.async {
 
                         addLog(message)
+
+                        if message.hasPrefix("FILE:") {
+
+                            currentFile = String(
+                                message.dropFirst(5)
+                            )
+                        }
+
+                        if message.hasPrefix("PROGRESS:") {
+
+                            let values = message
+                                .dropFirst(9)
+                                .split(separator: "/")
+
+                            if values.count == 2,
+                               let done = Double(values[0]),
+                               let total = Double(values[1]),
+                               total > 0 {
+
+                                progressValue = done / total
+
+                                progressText =
+                                    "\(Int(done))/\(Int(total))"
+                            }
+                        }
                     }
                 }
 
@@ -681,8 +737,13 @@ struct ContentView: View {
 
                     successCount = result.success.count
                     failedCount = result.failed.count
+                    skippedCount = result.skipped.count
 
-                    addLog("서명 작업 완료")
+                    progressValue = 1
+                    currentFile = "작업 완료"
+                    progressText = "전체 작업 완료"
+
+                    addLog("전체 작업 완료")
 
                     isSigning = false
                 }
@@ -690,6 +751,9 @@ struct ContentView: View {
             } catch {
 
                 DispatchQueue.main.async {
+
+                    currentFile = "작업 실패"
+                    progressText = error.localizedDescription
 
                     addLog(
                         "오류: \(error.localizedDescription)"
@@ -701,12 +765,11 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Add Log
+    // MARK: Log
 
     private func addLog(_ message: String) {
 
         let formatter = DateFormatter()
-
         formatter.dateFormat = "HH:mm:ss"
 
         logs.append(
