@@ -1,6 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Menu
+
 enum SignerPage: String, CaseIterable, Identifiable {
     case source = "Framework"
     case destination = "저장 위치"
@@ -12,16 +14,25 @@ enum SignerPage: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .source: return "shippingbox"
-        case .destination: return "folder.badge.checkmark"
-        case .certificate: return "key.horizontal"
-        case .signing: return "signature"
-        case .logs: return "terminal"
+        case .source:
+            return "shippingbox"
+        case .destination:
+            return "folder.badge.checkmark"
+        case .certificate:
+            return "key.horizontal"
+        case .signing:
+            return "signature"
+        case .logs:
+            return "terminal"
         }
     }
 }
 
+// MARK: - ContentView
+
 struct ContentView: View {
+
+    // MARK: State
 
     @State private var selectedPage: SignerPage? = .source
 
@@ -48,101 +59,123 @@ struct ContentView: View {
     @State private var successCount = 0
     @State private var failedCount = 0
 
-var body: some View {
+    // MARK: Main View
 
-    Group {
+    var body: some View {
 
-        if #available(iOS 16.0, *) {
+        NavigationView {
 
-            NavigationSplitView {
+            HStack(spacing: 0) {
 
-                List(selection: $selectedPage) {
+                // 왼쪽 메뉴
 
-                    Section("WORKSPACE") {
+                VStack(alignment: .leading, spacing: 6) {
 
-                        ForEach(SignerPage.allCases) { page in
-
-                            Label(
-                                page.rawValue,
-                                systemImage: page.icon
-                            )
-                            .tag(Optional(page))
-                        }
-                    }
-                }
-                .listStyle(.sidebar)
-                .navigationTitle("NX2Apple")
-                .navigationSplitViewColumnWidth(
-                    min: 170,
-                    ideal: 210,
-                    max: 260
-                )
-
-            } detail: {
-
-                detailContent
-                    .navigationTitle(
-                        selectedPage?.rawValue ?? "NX2Apple Signer"
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .navigationSplitViewStyle(.balanced)
-
-        } else {
-
-            NavigationView {
-
-                List(selection: $selectedPage) {
+                    Text("NX2Apple")
+                        .font(.title3.weight(.bold))
+                        .padding(.horizontal, 12)
+                        .padding(.top, 18)
+                        .padding(.bottom, 12)
 
                     ForEach(SignerPage.allCases) { page in
 
-                        NavigationLink(
-                            destination: detailContent,
-                            tag: page,
-                            selection: $selectedPage
-                        ) {
-                            Label(page.rawValue, systemImage: page.icon)
+                        Button {
+
+                            selectedPage = page
+
+                        } label: {
+
+                            HStack(spacing: 11) {
+
+                                Image(systemName: page.icon)
+                                    .font(.system(size: 17))
+                                    .frame(width: 24)
+
+                                Text(page.rawValue)
+                                    .font(.system(size: 14, weight: .medium))
+
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 13)
+                            .foregroundColor(
+                                selectedPage == page
+                                ? .blue
+                                : .primary
+                            )
+                            .background(
+                                selectedPage == page
+                                ? Color.blue.opacity(0.13)
+                                : Color.clear
+                            )
+                            .clipShape(
+                                RoundedRectangle(cornerRadius: 9)
+                            )
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
+
+                    Spacer()
                 }
-                .navigationTitle("NX2Apple")
+                .padding(.horizontal, 7)
+                .frame(width: 165)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground)
+                )
+
+                Divider()
+
+                // 오른쪽 콘텐츠
+
+                detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .navigationBarHidden(true)
+        }
+        .navigationViewStyle(.stack)
+        .tint(.blue)
+
+        // MARK: File Importers
+
+        .fileImporter(
+            isPresented: $showingSourcePicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+
+            handleFolderSelection(result, isSource: true)
+        }
+
+        .fileImporter(
+            isPresented: $showingDestinationPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+
+            handleFolderSelection(result, isSource: false)
+        }
+
+        .fileImporter(
+            isPresented: $showingProfilePicker,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false
+        ) { result in
+
+            handleFileSelection(result, isProfile: true)
+        }
+
+        .fileImporter(
+            isPresented: $showingP12Picker,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false
+        ) { result in
+
+            handleFileSelection(result, isProfile: false)
         }
     }
-    .tint(.blue)
 
-    .fileImporter(
-        isPresented: $showingSourcePicker,
-        allowedContentTypes: [.folder],
-        allowsMultipleSelection: false
-    ) { result in
-        handleFolderSelection(result, isSource: true)
-    }
-
-    .fileImporter(
-        isPresented: $showingDestinationPicker,
-        allowedContentTypes: [.folder],
-        allowsMultipleSelection: false
-    ) { result in
-        handleFolderSelection(result, isSource: false)
-    }
-
-    .fileImporter(
-        isPresented: $showingProfilePicker,
-        allowedContentTypes: [.data],
-        allowsMultipleSelection: false
-    ) { result in
-        handleFileSelection(result, isProfile: true)
-    }
-
-    .fileImporter(
-        isPresented: $showingP12Picker,
-        allowedContentTypes: [.data],
-        allowsMultipleSelection: false
-    ) { result in
-        handleFileSelection(result, isProfile: false)
-    }
-}
+    // MARK: Detail Content
 
     private var detailContent: some View {
 
@@ -172,7 +205,9 @@ var body: some View {
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(
+            Color(uiColor: .systemGroupedBackground)
+        )
     }
 
     // MARK: Framework
@@ -190,9 +225,15 @@ var body: some View {
                 pathLabel(sourceURL)
 
                 Button {
+
                     showingSourcePicker = true
+
                 } label: {
-                    Label("원본 폴더 선택", systemImage: "folder")
+
+                    Label(
+                        "원본 폴더 선택",
+                        systemImage: "folder"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -200,8 +241,11 @@ var body: some View {
 
         } label: {
 
-            Label("원본 Framework", systemImage: "shippingbox")
-                .font(.headline)
+            Label(
+                "원본 Framework",
+                systemImage: "shippingbox"
+            )
+            .font(.headline)
         }
     }
 
@@ -220,9 +264,15 @@ var body: some View {
                 pathLabel(destinationURL)
 
                 Button {
+
                     showingDestinationPicker = true
+
                 } label: {
-                    Label("저장 폴더 선택", systemImage: "folder.badge.plus")
+
+                    Label(
+                        "저장 폴더 선택",
+                        systemImage: "folder.badge.plus"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -230,8 +280,11 @@ var body: some View {
 
         } label: {
 
-            Label("저장 위치", systemImage: "folder.badge.checkmark")
-                .font(.headline)
+            Label(
+                "저장 위치",
+                systemImage: "folder.badge.checkmark"
+            )
+            .font(.headline)
         }
     }
 
@@ -247,6 +300,7 @@ var body: some View {
                     title: "Provisioning Profile",
                     filename: profileURL?.lastPathComponent
                 ) {
+
                     showingProfilePicker = true
                 }
 
@@ -256,11 +310,15 @@ var body: some View {
                     title: "P12 인증서",
                     filename: p12URL?.lastPathComponent
                 ) {
+
                     showingP12Picker = true
                 }
 
-                SecureField("P12 비밀번호", text: $password)
-                    .textFieldStyle(.roundedBorder)
+                SecureField(
+                    "P12 비밀번호",
+                    text: $password
+                )
+                .textFieldStyle(.roundedBorder)
 
                 Divider()
 
@@ -279,8 +337,11 @@ var body: some View {
 
         } label: {
 
-            Label("인증서 설정", systemImage: "key.horizontal")
-                .font(.headline)
+            Label(
+                "인증서 설정",
+                systemImage: "key.horizontal"
+            )
+            .font(.headline)
         }
     }
 
@@ -313,11 +374,15 @@ var body: some View {
                 }
 
                 Button {
+
                     startSigning()
+
                 } label: {
 
                     Label(
-                        isSigning ? "서명 진행 중..." : "Framework 서명 시작",
+                        isSigning
+                        ? "서명 진행 중..."
+                        : "Framework 서명 시작",
                         systemImage: "checkmark.shield"
                     )
                     .frame(maxWidth: .infinity)
@@ -326,6 +391,7 @@ var body: some View {
                 .disabled(isSigning || !canStartSigning)
 
                 if isSigning {
+
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 }
@@ -334,8 +400,11 @@ var body: some View {
 
         } label: {
 
-            Label("서명 실행", systemImage: "signature")
-                .font(.headline)
+            Label(
+                "서명 실행",
+                systemImage: "signature"
+            )
+            .font(.headline)
         }
     }
 
@@ -349,12 +418,23 @@ var body: some View {
 
                 VStack(alignment: .leading, spacing: 7) {
 
-                    ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
+                    ForEach(
+                        Array(logs.enumerated()),
+                        id: \.offset
+                    ) { _, log in
 
                         Text(log)
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(
+                                .system(
+                                    size: 12,
+                                    design: .monospaced
+                                )
+                            )
                             .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
                     }
                 }
             }
@@ -362,12 +442,15 @@ var body: some View {
 
         } label: {
 
-            Label("작업 로그", systemImage: "terminal")
-                .font(.headline)
+            Label(
+                "작업 로그",
+                systemImage: "terminal"
+            )
+            .font(.headline)
         }
     }
 
-    // MARK: Components
+    // MARK: Path Label
 
     private func pathLabel(_ url: URL?) -> some View {
 
@@ -376,16 +459,24 @@ var body: some View {
             Image(systemName: "folder")
                 .foregroundStyle(.secondary)
 
-            Text(url?.lastPathComponent ?? "선택된 폴더 없음")
-                .font(.subheadline)
-                .lineLimit(2)
+            Text(
+                url?.lastPathComponent ?? "선택된 폴더 없음"
+            )
+            .font(.subheadline)
+            .lineLimit(2)
 
             Spacer()
         }
         .padding(10)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(
+            Color(uiColor: .tertiarySystemGroupedBackground)
+        )
+        .clipShape(
+            RoundedRectangle(cornerRadius: 8)
+        )
     }
+
+    // MARK: File Selection Row
 
     private func fileSelectionRow(
         title: String,
@@ -402,23 +493,33 @@ var body: some View {
                     Text(title)
                         .font(.subheadline.weight(.medium))
 
-                    Text(filename ?? "파일을 선택해 주세요")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Text(
+                        filename ?? "파일을 선택해 주세요"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: filename == nil
-                      ? "plus.circle"
-                      : "checkmark.circle.fill")
-                    .foregroundColor(filename == nil ? .secondary : .green)
+                Image(
+                    systemName: filename == nil
+                    ? "plus.circle"
+                    : "checkmark.circle.fill"
+                )
+                .foregroundColor(
+                    filename == nil
+                    ? .secondary
+                    : .green
+                )
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: Result Item
 
     private func resultItem(
         title: String,
@@ -438,8 +539,12 @@ var body: some View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(
+            Color(uiColor: .tertiarySystemGroupedBackground)
+        )
+        .clipShape(
+            RoundedRectangle(cornerRadius: 10)
+        )
     }
 
     // MARK: Validation
@@ -454,7 +559,7 @@ var body: some View {
         !password.isEmpty
     }
 
-    // MARK: File Selection
+    // MARK: Folder Selection
 
     private func handleFolderSelection(
         _ result: Result<[URL], Error>,
@@ -465,21 +570,36 @@ var body: some View {
 
         case .success(let urls):
 
-            guard let url = urls.first else { return }
+            guard let url = urls.first else {
+                return
+            }
 
             if isSource {
+
                 sourceURL = url
-                addLog("원본 폴더 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "원본 폴더 선택: \(url.lastPathComponent)"
+                )
+
             } else {
+
                 destinationURL = url
-                addLog("저장 폴더 선택: \(url.lastPathComponent)")
+
+                addLog(
+                    "저장 폴더 선택: \(url.lastPathComponent)"
+                )
             }
 
         case .failure(let error):
 
-            addLog("폴더 선택 실패: \(error.localizedDescription)")
+            addLog(
+                "폴더 선택 실패: \(error.localizedDescription)"
+            )
         }
     }
+
+    // MARK: File Selection
 
     private func handleFileSelection(
         _ result: Result<[URL], Error>,
@@ -490,23 +610,30 @@ var body: some View {
 
         case .success(let urls):
 
-            guard let url = urls.first else { return }
+            guard let url = urls.first else {
+                return
+            }
 
             if isProfile {
+
                 profileURL = url
                 addLog("프로파일 선택 완료")
+
             } else {
+
                 p12URL = url
                 addLog("P12 인증서 선택 완료")
             }
 
         case .failure(let error):
 
-            addLog("파일 선택 실패: \(error.localizedDescription)")
+            addLog(
+                "파일 선택 실패: \(error.localizedDescription)"
+            )
         }
     }
 
-    // MARK: Signing
+    // MARK: Start Signing
 
     private func startSigning() {
 
@@ -520,6 +647,7 @@ var body: some View {
         }
 
         isSigning = true
+
         successCount = 0
         failedCount = 0
 
@@ -544,6 +672,7 @@ var body: some View {
                 ) { message in
 
                     DispatchQueue.main.async {
+
                         addLog(message)
                     }
                 }
@@ -554,6 +683,7 @@ var body: some View {
                     failedCount = result.failed.count
 
                     addLog("서명 작업 완료")
+
                     isSigning = false
                 }
 
@@ -561,16 +691,22 @@ var body: some View {
 
                 DispatchQueue.main.async {
 
-                    addLog("오류: \(error.localizedDescription)")
+                    addLog(
+                        "오류: \(error.localizedDescription)"
+                    )
+
                     isSigning = false
                 }
             }
         }
     }
 
+    // MARK: Add Log
+
     private func addLog(_ message: String) {
 
         let formatter = DateFormatter()
+
         formatter.dateFormat = "HH:mm:ss"
 
         logs.append(
