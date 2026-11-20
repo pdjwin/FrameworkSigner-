@@ -27,18 +27,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pdjwin.nx2applesigner
         PRODUCT_NAME: NX2AppleSigner
-
         SWIFT_VERSION: "5.0"
 
-        # iPhone 전용 빌드
         TARGETED_DEVICE_FAMILY: "1"
 
-        # 앱 아이콘 연결
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: NX2Apple Signer
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+
+        INFOPLIST_KEY_UIFileSharingEnabled: YES
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
 
         IPHONEOS_DEPLOYMENT_TARGET: "15.0"
 
