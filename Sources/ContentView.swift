@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var p12URL: URL?
 
     @State private var bundleIdentifier = ""
+    @State private var p12Password = ""
 
     @State private var deleteFailedCopies = false
 
@@ -20,6 +21,8 @@ struct ContentView: View {
     @State private var statusMessage = "작업 준비 완료"
     @State private var isProcessing = false
 
+    @State private var logs: [String] = []
+
     var body: some View {
 
         NavigationView {
@@ -29,17 +32,12 @@ struct ContentView: View {
                 VStack(spacing: 22) {
 
                     headerSection
-
                     statusSection
-
                     folderSection
-
                     certificateSection
-
                     signingSection
-
                     startButton
-
+                    logSection
                     footerSection
                 }
                 .padding(20)
@@ -47,7 +45,7 @@ struct ContentView: View {
             .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
         }
-        .navigationViewStyle(StackNavigationViewStyle)
+        .navigationViewStyle(StackNavigationViewStyle())
 
         .fileImporter(
             isPresented: $showSourcePicker,
@@ -57,7 +55,9 @@ struct ContentView: View {
             ],
             allowsMultipleSelection: false
         ) { result in
-            handleSelection(result) { sourceURL = $0 }
+            handleSelection(result) {
+                sourceURL = $0
+            }
         }
 
         .fileImporter(
@@ -65,7 +65,9 @@ struct ContentView: View {
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false
         ) { result in
-            handleSelection(result) { destinationURL = $0 }
+            handleSelection(result) {
+                destinationURL = $0
+            }
         }
 
         .fileImporter(
@@ -73,7 +75,9 @@ struct ContentView: View {
             allowedContentTypes: [.data],
             allowsMultipleSelection: false
         ) { result in
-            handleSelection(result) { profileURL = $0 }
+            handleSelection(result) {
+                profileURL = $0
+            }
         }
 
         .fileImporter(
@@ -81,7 +85,9 @@ struct ContentView: View {
             allowedContentTypes: [.data],
             allowsMultipleSelection: false
         ) { result in
-            handleSelection(result) { p12URL = $0 }
+            handleSelection(result) {
+                p12URL = $0
+            }
         }
     }
 
@@ -128,7 +134,7 @@ struct ContentView: View {
                   ? "arrow.triangle.2.circlepath"
                   : "checkmark.circle.fill")
                 .font(.system(size: 26))
-                .foregroundColor(.green)
+                .foregroundColor(isProcessing ? .blue : .green)
 
             VStack(alignment: .leading, spacing: 4) {
 
@@ -158,18 +164,20 @@ struct ContentView: View {
             fileSelectionRow(
                 title: "원본 Framework 폴더",
                 subtitle: sourceURL?.lastPathComponent ?? "원본 폴더 선택",
-                icon: "folder.badge.plus",
-                action: { showSourcePicker = true }
-            )
+                icon: "folder.badge.plus"
+            ) {
+                showSourcePicker = true
+            }
 
             fileSelectionRow(
                 title: "대상 Frameworks 폴더",
                 subtitle: destinationURL?.lastPathComponent ?? "복사할 위치 선택",
-                icon: "folder.fill.badge.plus",
-                action: { showDestinationPicker = true }
-            )
+                icon: "folder.fill.badge.plus"
+            ) {
+                showDestinationPicker = true
+            }
 
-            Text("원본은 그대로 유지하며, 앱 내부 작업 공간에 복사한 뒤 서명합니다.")
+            Text("원본은 변경하지 않습니다. 앱 내부 작업 공간에 복사한 후 서명합니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -188,17 +196,33 @@ struct ContentView: View {
 
             fileSelectionRow(
                 title: "MobileProvision",
-                subtitle: profileURL?.lastPathComponent ?? "프로비저닝 프로파일 선택",
-                icon: "doc.badge.gearshape",
-                action: { showProfilePicker = true }
-            )
+                subtitle: profileURL?.lastPathComponent ?? "프로파일 선택",
+                icon: "doc.badge.gearshape"
+            ) {
+                showProfilePicker = true
+            }
 
             fileSelectionRow(
                 title: "P12 인증서",
                 subtitle: p12URL?.lastPathComponent ?? "P12 파일 선택",
-                icon: "key.horizontal",
-                action: { showP12Picker = true }
-            )
+                icon: "key.horizontal"
+            ) {
+                showP12Picker = true
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+
+                Text("P12 비밀번호")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                SecureField("인증서 비밀번호 입력", text: $p12Password)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(14)
+                    .background(Color(.tertiarySystemGroupedBackground))
+                    .cornerRadius(12)
+            }
 
             VStack(alignment: .leading, spacing: 8) {
 
@@ -207,7 +231,7 @@ struct ContentView: View {
                     .fontWeight(.semibold)
 
                 TextField(
-                    "예: com.example.nx2apple",
+                    "NX2Apple Bundle ID 입력",
                     text: $bundleIdentifier
                 )
                 .textInputAutocapitalization(.never)
@@ -236,16 +260,19 @@ struct ContentView: View {
             )
 
             Text(deleteFailedCopies
-                 ? "서명에 실패한 작업용 복사본을 삭제합니다. 원본은 삭제하지 않습니다."
-                 : "실패한 작업용 복사본을 보존하여 오류를 확인할 수 있습니다.")
+                 ? "실패한 작업용 복사본만 삭제합니다. 원본은 유지됩니다."
+                 : "실패한 작업용 복사본을 보존하여 원인을 확인합니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
             Divider()
 
-            Label("원본 파일 보호: 항상 활성화", systemImage: "lock.fill")
-                .font(.subheadline)
-                .foregroundColor(.green)
+            Label(
+                "원본 파일 보호: 항상 활성화",
+                systemImage: "lock.fill"
+            )
+            .font(.subheadline)
+            .foregroundColor(.green)
         }
         .padding(20)
         .background(Color(.secondarySystemGroupedBackground))
@@ -257,26 +284,67 @@ struct ContentView: View {
     private var startButton: some View {
 
         Button {
-
-            statusMessage = "서명 엔진 연결을 기다리고 있습니다."
-
+            startSigning()
         } label: {
 
             HStack {
 
-                Image(systemName: "signature")
+                if isProcessing {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: "signature")
+                }
 
-                Text("일괄 서명 시작")
+                Text(isProcessing ? "서명 진행 중..." : "일괄 서명 시작")
                     .fontWeight(.bold)
             }
             .font(.headline)
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(18)
-            .background(Color.blue)
+            .background(isProcessing ? Color.gray : Color.blue)
             .cornerRadius(16)
         }
         .disabled(isProcessing)
+    }
+
+    // MARK: - Logs
+
+    private var logSection: some View {
+
+        VStack(alignment: .leading, spacing: 12) {
+
+            sectionTitle("작업 로그", icon: "text.alignleft")
+
+            if logs.isEmpty {
+
+                Text("아직 작업 기록이 없습니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+
+            } else {
+
+                ForEach(Array(logs.enumerated()), id: \.offset) { item in
+
+                    HStack(alignment: .top, spacing: 8) {
+
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 6))
+                            .padding(.top, 6)
+
+                        Text(item.element)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(18)
     }
 
     // MARK: - Footer
@@ -372,10 +440,112 @@ struct ContentView: View {
             }
 
             completion(url)
+            addLog("파일 선택: \(url.lastPathComponent)")
 
         case .failure(let error):
 
-            statusMessage = "파일 선택 오류: \(error.localizedDescription)"
+            statusMessage = "파일 선택 오류"
+            addLog(error.localizedDescription)
         }
+    }
+
+    // MARK: - Signing
+
+    private func startSigning() {
+
+        guard !isProcessing else {
+            return
+        }
+
+        guard let source = sourceURL,
+              let destination = destinationURL,
+              let profile = profileURL,
+              let p12 = p12URL else {
+
+            statusMessage = "필수 파일을 모두 선택해 주세요."
+            addLog("필수 파일이 누락되었습니다.")
+            return
+        }
+
+        guard !bundleIdentifier.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty else {
+
+            statusMessage = "Bundle ID를 입력해 주세요."
+            return
+        }
+
+        guard !p12Password.isEmpty else {
+
+            statusMessage = "P12 비밀번호를 입력해 주세요."
+            return
+        }
+
+        isProcessing = true
+        statusMessage = "서명 작업 준비 중..."
+        logs.removeAll()
+
+        let selectedBundleID = bundleIdentifier
+        let selectedPassword = p12Password
+        let selectedDeleteOption = deleteFailedCopies
+
+        addLog("서명 작업을 시작합니다.")
+
+        DispatchQueue.global(qos: .userInitiated).async {
+
+            do {
+
+                let result = try SigningService.signFolder(
+                    sourceURL: source,
+                    destinationURL: destination,
+                    profileURL: profile,
+                    p12URL: p12,
+                    password: selectedPassword,
+                    hostBundleIdentifier: selectedBundleID,
+                    deleteFailedCopies: selectedDeleteOption
+                ) { message in
+
+                    DispatchQueue.main.async {
+                        addLog(message)
+                        statusMessage = message
+                    }
+                }
+
+                DispatchQueue.main.async {
+
+                    isProcessing = false
+
+                    statusMessage = "작업 완료"
+
+                    addLog("────────────")
+                    addLog("성공: \(result.success.count)개")
+                    addLog("실패: \(result.failed.count)개")
+                    addLog("보존된 실패 복사본: \(result.retainedFailedCopies.count)개")
+                }
+
+            } catch {
+
+                DispatchQueue.main.async {
+
+                    isProcessing = false
+
+                    statusMessage = "작업 실패"
+
+                    addLog("오류: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Log Helper
+
+    private func addLog(_ message: String) {
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+
+        let time = formatter.string(from: Date())
+
+        logs.append("[\(time)] \(message)")
     }
 }
