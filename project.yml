@@ -23,6 +23,7 @@ targets:
         product: RorkSign
 
     info:
+      path: Info.plist
       properties:
         CFBundleDisplayName: NX2Apple Signer
         UIFileSharingEnabled: true
@@ -35,6 +36,6 @@ targets:
         PRODUCT_NAME: NX2AppleSigner
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
         IPHONEOS_DEPLOYMENT_TARGET: "15.0"
         CODE_SIGNING_ALLOWED: NO
