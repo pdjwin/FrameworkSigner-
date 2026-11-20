@@ -17,17 +17,24 @@ permissions:
 jobs:
   build:
     name: Build unsigned iOS IPA
-    runs-on: macos-15
+    runs-on: xcode-27
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Select Xcode 27.2
         run: |
-          xcode-select -p
+          sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
+
+          echo "=== Xcode Version ==="
           xcodebuild -version
-          swift --version
+
+          echo "=== Available iOS SDK ==="
+          xcodebuild -showsdks
+
+          echo "=== Verify iOS 27.2 SDK ==="
+          xcodebuild -version -sdk iphoneos27.2
 
       - name: Install XcodeGen
         run: |
