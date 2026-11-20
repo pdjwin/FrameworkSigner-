@@ -4,7 +4,9 @@ import SwiftUI
 struct NX2AppleSignerApp: App {
 
     var body: some Scene {
+
         WindowGroup {
+
             ContentView()
         }
     }
