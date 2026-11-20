@@ -64,13 +64,25 @@ jobs:
       # 7. IPA 패키징
       - name: Package IPA
         run: |
+          set -e
+
+          rm -rf Payload
           mkdir -p Payload
 
           cp -R \
             build/Build/Products/Release-iphoneos/FrameworkSigner.app \
-            Payload/
+            Payload/FrameworkSigner.app
 
-          ditto -c -k --sequesterRsrc Payload FrameworkSigner-unsigned.ipa
+          zip -r -X FrameworkSigner-unsigned.ipa Payload
+
+          echo "Checking IPA structure..."
+
+          unzip -l FrameworkSigner-unsigned.ipa
+
+          unzip -Z1 FrameworkSigner-unsigned.ipa \
+            | grep -q '^Payload/FrameworkSigner.app/Info.plist$'
+
+          echo "IPA structure verification passed."
 
       # 8. IPA 업로드
       - name: Upload IPA
