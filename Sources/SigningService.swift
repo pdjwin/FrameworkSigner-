@@ -1,6 +1,6 @@
 import Foundation
-import RorkSign
 import CryptoKit
+import RorkSign
 
 struct FrameworkSigningResult {
 
@@ -19,8 +19,9 @@ enum SigningService {
         case invalidDestination
         case missingBundleIdentifier
         case noFrameworkFound
-        case copyFailed(String)
+        case invalidCertificate
         case destinationConflict(String)
+        case copyFailed(String)
 
         var errorDescription: String? {
 
@@ -33,21 +34,22 @@ enum SigningService {
                 return "저장 폴더에 접근할 수 없습니다."
 
             case .missingBundleIdentifier:
-                return "Bundle ID가 필요합니다."
+                return "Bundle ID를 입력해 주세요."
 
             case .noFrameworkFound:
                 return "Framework를 찾지 못했습니다."
 
-            case .copyFailed(let message):
-                return "복사 실패: \(message)"
+            case .invalidCertificate:
+                return "인증서 검증에 실패했습니다."
 
             case .destinationConflict(let name):
-                return "기존 파일과 내용이 달라 자동 교체하지 않았습니다: \(name)"
+                return "기존 파일과 내용이 다릅니다: \(name)"
+
+            case .copyFailed(let reason):
+                return "복사 실패: \(reason)"
             }
         }
     }
-
-    // MARK: Main
 
     static func signFolder(
         sourceURL: URL,
@@ -60,34 +62,45 @@ enum SigningService {
         progress: @escaping (String) -> Void
     ) throws -> FrameworkSigningResult {
 
-        guard !hostBundleIdentifier.isEmpty else {
+        let fileManager = FileManager.default
+
+        let bundleID = hostBundleIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !bundleID.isEmpty else {
             throw SigningError.missingBundleIdentifier
         }
 
-        let accessURLs = [
-            sourceURL,
-            destinationURL,
-            profileURL,
-            p12URL
-        ]
+        let sourceAccess =
+            sourceURL.startAccessingSecurityScopedResource()
 
-        var accessed: [URL] = []
+        let destinationAccess =
+            destinationURL.startAccessingSecurityScopedResource()
 
-        for url in accessURLs {
+        let profileAccess =
+            profileURL.startAccessingSecurityScopedResource()
 
-            if url.startAccessingSecurityScopedResource() {
-                accessed.append(url)
-            }
-        }
+        let p12Access =
+            p12URL.startAccessingSecurityScopedResource()
 
         defer {
 
-            for url in accessed {
-                url.stopAccessingSecurityScopedResource()
+            if sourceAccess {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+
+            if destinationAccess {
+                destinationURL.stopAccessingSecurityScopedResource()
+            }
+
+            if profileAccess {
+                profileURL.stopAccessingSecurityScopedResource()
+            }
+
+            if p12Access {
+                p12URL.stopAccessingSecurityScopedResource()
             }
         }
-
-        let fileManager = FileManager.default
 
         guard fileManager.fileExists(
             atPath: sourceURL.path
@@ -101,9 +114,9 @@ enum SigningService {
             throw SigningError.invalidDestination
         }
 
-        // MARK: Certificate Validation
+        // MARK: Certificate
 
-        progress("인증서 검증 시작")
+        progress("인증서 데이터 읽기")
 
         let profileData = try Data(contentsOf: profileURL)
         let credentialData = try Data(contentsOf: p12URL)
@@ -119,111 +132,97 @@ enum SigningService {
 
         // MARK: Workspace
 
-        let documents = fileManager.urls(
+        let documentsURL = fileManager.urls(
             for: .documentDirectory,
             in: .userDomainMask
         )[0]
 
-        let workspace = documents
+        let workspaceURL = documentsURL
             .appendingPathComponent(
                 "Workspace",
                 isDirectory: true
             )
 
         try fileManager.createDirectory(
-            at: workspace,
+            at: workspaceURL,
             withIntermediateDirectories: true
         )
 
         let jobID = UUID().uuidString
 
-        let jobDirectory = workspace
+        let jobURL = workspaceURL
             .appendingPathComponent(
                 jobID,
                 isDirectory: true
             )
 
         try fileManager.createDirectory(
-            at: jobDirectory,
+            at: jobURL,
             withIntermediateDirectories: true
         )
 
-        progress("임시 작업 폴더 생성: \(jobID)")
-
-        let copiedSource = jobDirectory
+        let copiedSourceURL = jobURL
             .appendingPathComponent(
                 sourceURL.lastPathComponent,
                 isDirectory: true
             )
 
-        // MARK: File Enumeration
+        // MARK: Copy Source
 
-        let sourceFiles = try collectFiles(
-            at: sourceURL
-        )
+        progress("원본 폴더 복사 시작")
 
-        guard !sourceFiles.isEmpty else {
-            throw SigningError.invalidSource
+        do {
+
+            try copyDirectory(
+                from: sourceURL,
+                to: copiedSourceURL,
+                progress: progress
+            )
+
+        } catch {
+
+            try? fileManager.removeItem(at: jobURL)
+
+            throw SigningError.copyFailed(
+                error.localizedDescription
+            )
         }
 
-        let totalBytes = sourceFiles.reduce(Int64(0)) {
-            $0 + $1.size
-        }
+        progress("원본 복사 완료")
+        progress("원본 파일은 변경하지 않았습니다.")
 
-        progress("복사 대상 파일: \(sourceFiles.count)개")
-        progress("전체 복사 용량: \(totalBytes) bytes")
+        // MARK: Find Frameworks
 
-        // MARK: Copy
+        var frameworks: [URL] = []
 
-        try fileManager.createDirectory(
-            at: copiedSource.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
+        if copiedSourceURL.pathExtension.lowercased() == "framework" {
 
-        var copiedBytes: Int64 = 0
+            frameworks.append(copiedSourceURL)
 
-        for (index, item) in sourceFiles.enumerated() {
+        } else {
 
-            let relativePath = String(
-                item.url.path.dropFirst(sourceURL.path.count)
-            )
-            .trimmingCharacters(
-                in: CharacterSet(charactersIn: "/")
-            )
+            guard let enumerator = fileManager.enumerator(
+                at: copiedSourceURL,
+                includingPropertiesForKeys: [
+                    .isDirectoryKey,
+                    .isSymbolicLinkKey
+                ],
+                options: []
+            ) else {
 
-            let targetURL = copiedSource
-                .appendingPathComponent(relativePath)
+                throw SigningError.noFrameworkFound
+            }
 
-            progress("FILE:\(relativePath)")
+            for case let itemURL as URL in enumerator {
 
-            try copyItemSafely(
-                from: item.url,
-                to: targetURL
-            )
+                if itemURL.pathExtension.lowercased() == "framework" {
 
-            copiedBytes += item.size
+                    frameworks.append(itemURL)
 
-            progress(
-                "PROGRESS:\(index + 1)/\(sourceFiles.count)"
-            )
-
-            progress(
-                "복사 완료: \(relativePath)"
-            )
-
-            if item.isDirectory {
-                continue
+                    enumerator.skipDescendants()
+                }
             }
         }
-
-        progress("원본 폴더 복사 완료")
-        progress("원본 파일은 수정하지 않았습니다.")
-
-        // MARK: Framework Search
-
-        let frameworks = try findFrameworks(
-            in: copiedSource
-        )
 
         guard !frameworks.isEmpty else {
             throw SigningError.noFrameworkFound
@@ -231,9 +230,9 @@ enum SigningService {
 
         progress("검색된 Framework: \(frameworks.count)개")
 
-        var result = FrameworkSigningResult()
-
         // MARK: Sign
+
+        var result = FrameworkSigningResult()
 
         for (index, frameworkURL) in frameworks.enumerated() {
 
@@ -247,8 +246,7 @@ enum SigningService {
 
                 var options = FrameworkSigningOptions()
 
-                options.codeDirectoryIdentifier =
-                    hostBundleIdentifier
+                options.codeDirectoryIdentifier = bundleID
 
                 try RorkSigner.signFrameworkWithCredential(
                     at: frameworkURL,
@@ -268,9 +266,7 @@ enum SigningService {
                     "\(name): \(message)"
                 )
 
-                progress(
-                    "\(name) 서명 실패: \(message)"
-                )
+                progress("\(name) 서명 실패: \(message)")
 
                 if deleteFailedCopies {
 
@@ -278,44 +274,56 @@ enum SigningService {
                         at: frameworkURL
                     )
 
-                    progress(
-                        "\(name) 임시 복사본 삭제"
-                    )
+                    progress("\(name) 임시 복사본 삭제")
 
                 } else {
 
                     result.retainedFailedCopies.append(name)
 
-                    progress(
-                        "\(name) 임시 복사본 보존"
-                    )
+                    progress("\(name) 임시 복사본 보존")
                 }
 
                 continue
             }
 
-            // MARK: Destination
+            // MARK: Destination Path
 
             let relativePath = String(
                 frameworkURL.path.dropFirst(
-                    copiedSource.path.count
+                    copiedSourceURL.path.count
                 )
             )
-            .trimmingCharacters(
-                in: CharacterSet(charactersIn: "/")
-            )
 
-            let outputURL = destinationURL
-                .appendingPathComponent(
-                    relativePath,
-                    isDirectory: true
-                )
+            let cleanRelativePath = relativePath.hasPrefix("/")
+                ? String(relativePath.dropFirst())
+                : relativePath
 
-            do {
+            let outputURL: URL
 
-                if fileManager.fileExists(
-                    atPath: outputURL.path
-                ) {
+            if cleanRelativePath.isEmpty {
+
+                outputURL = destinationURL
+                    .appendingPathComponent(
+                        name,
+                        isDirectory: true
+                    )
+
+            } else {
+
+                outputURL = destinationURL
+                    .appendingPathComponent(
+                        cleanRelativePath,
+                        isDirectory: true
+                    )
+            }
+
+            // MARK: Duplicate Check
+
+            if fileManager.fileExists(
+                atPath: outputURL.path
+            ) {
+
+                do {
 
                     let existingHash = try directoryHash(
                         at: outputURL
@@ -330,14 +338,39 @@ enum SigningService {
                         result.skipped.append(name)
 
                         progress(
-                            "\(name) 내용이 동일하여 저장 스킵"
+                            "\(name) 동일 파일 확인 - 저장 생략"
                         )
 
                         continue
                     }
 
-                    throw SigningError.destinationConflict(name)
+                    result.failed.append(
+                        "\(name): 기존 파일과 내용이 다릅니다."
+                    )
+
+                    progress(
+                        "\(name) 기존 파일 보호 - 자동 덮어쓰기 안 함"
+                    )
+
+                    continue
+
+                } catch {
+
+                    result.failed.append(
+                        "\(name): 비교 실패 - \(error.localizedDescription)"
+                    )
+
+                    progress(
+                        "\(name) 비교 실패 - 기존 파일 보호"
+                    )
+
+                    continue
                 }
+            }
+
+            // MARK: Save
+
+            do {
 
                 try fileManager.createDirectory(
                     at: outputURL.deletingLastPathComponent(),
@@ -352,17 +385,17 @@ enum SigningService {
                 result.success.append(name)
 
                 progress(
-                    "\(name) 최종 저장 성공"
+                    "\(name) 저장 성공"
                 )
 
             } catch {
 
                 result.failed.append(
-                    "\(name): \(error.localizedDescription)"
+                    "\(name): 저장 실패 - \(error.localizedDescription)"
                 )
 
                 progress(
-                    "\(name) 저장 실패: \(error.localizedDescription)"
+                    "\(name) 저장 실패"
                 )
             }
         }
@@ -371,222 +404,180 @@ enum SigningService {
         progress("성공: \(result.success.count)")
         progress("실패: \(result.failed.count)")
         progress("스킵: \(result.skipped.count)")
+        progress("교체: \(result.replaced.count)")
 
         return result
     }
 
-    // MARK: File Item
+    // MARK: Recursive Copy
 
-    private struct FileItem {
-
-        let url: URL
-        let size: Int64
-        let isDirectory: Bool
-    }
-
-    // MARK: Collect Files
-
-    private static func collectFiles(
-        at root: URL
-    ) throws -> [FileItem] {
-
-        let manager = FileManager.default
-
-        var items: [FileItem] = []
-
-        func visit(_ url: URL) throws {
-
-            let attributes = try manager.attributesOfItem(
-                atPath: url.path
-            )
-
-            let type = attributes[.type] as? FileAttributeType
-
-            if type == .typeSymbolicLink {
-                return
-            }
-
-            if type == .typeDirectory {
-
-                items.append(
-                    FileItem(
-                        url: url,
-                        size: 0,
-                        isDirectory: true
-                    )
-                )
-
-                let children = try manager.contentsOfDirectory(
-                    at: url,
-                    includingPropertiesForKeys: nil,
-                    options: []
-                )
-
-                for child in children {
-                    try visit(child)
-                }
-
-            } else {
-
-                let size = (
-                    attributes[.size] as? NSNumber
-                )?.int64Value ?? 0
-
-                items.append(
-                    FileItem(
-                        url: url,
-                        size: size,
-                        isDirectory: false
-                    )
-                )
-            }
-        }
-
-        try visit(root)
-
-        return items
-    }
-
-    // MARK: Safe Copy
-
-    private static func copyItemSafely(
+    private static func copyDirectory(
         from source: URL,
-        to destination: URL
+        to destination: URL,
+        progress: @escaping (String) -> Void
     ) throws {
 
         let manager = FileManager.default
 
-        let attributes = try manager.attributesOfItem(
-            atPath: source.path
+        var isDirectory: ObjCBool = false
+
+        guard manager.fileExists(
+            atPath: source.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else {
+
+            throw SigningError.invalidSource
+        }
+
+        try manager.createDirectory(
+            at: destination,
+            withIntermediateDirectories: true
         )
 
-        let type = attributes[.type] as? FileAttributeType
+        let contents = try manager.contentsOfDirectory(
+            at: source,
+            includingPropertiesForKeys: [
+                .isDirectoryKey,
+                .isSymbolicLinkKey
+            ],
+            options: []
+        )
 
-        if type == .typeSymbolicLink {
+        for item in contents {
 
-            let link = try manager.destinationOfSymbolicLink(
-                atPath: source.path
+            let target = destination
+                .appendingPathComponent(
+                    item.lastPathComponent
+                )
+
+            progress("FILE:\(item.lastPathComponent)")
+
+            let values = try item.resourceValues(
+                forKeys: [
+                    .isDirectoryKey,
+                    .isSymbolicLinkKey
+                ]
             )
 
-            try manager.createSymbolicLink(
-                atPath: destination.path,
-                withDestinationPath: link
-            )
+            if values.isSymbolicLink == true {
 
-            return
-        }
+                let linkDestination = try manager.destinationOfSymbolicLink(
+                    atPath: item.path
+                )
 
-        if type == .typeDirectory {
+                try manager.createSymbolicLink(
+                    atPath: target.path,
+                    withDestinationPath: linkDestination
+                )
 
-            try manager.createDirectory(
-                at: destination,
-                withIntermediateDirectories: true
-            )
+            } else if values.isDirectory == true {
 
-            let children = try manager.contentsOfDirectory(
-                at: source,
-                includingPropertiesForKeys: nil,
-                options: []
-            )
+                try copyDirectory(
+                    from: item,
+                    to: target,
+                    progress: progress
+                )
 
-            for child in children {
+            } else {
 
-                try copyItemSafely(
-                    from: child,
-                    to: destination.appendingPathComponent(
-                        child.lastPathComponent
-                    )
+                try manager.copyItem(
+                    at: item,
+                    to: target
                 )
             }
-
-        } else {
-
-            try manager.createDirectory(
-                at: destination.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-
-            try manager.copyItem(
-                at: source,
-                to: destination
-            )
         }
-    }
-
-    // MARK: Find Frameworks
-
-    private static func findFrameworks(
-        in root: URL
-    ) throws -> [URL] {
-
-        let manager = FileManager.default
-
-        var frameworks: [URL] = []
-
-        if root.pathExtension.lowercased() == "framework" {
-
-            return [root]
-        }
-
-        guard let enumerator = manager.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: []
-        ) else {
-
-            throw SigningError.noFrameworkFound
-        }
-
-        for case let url as URL in enumerator {
-
-            if url.pathExtension.lowercased() == "framework" {
-
-                frameworks.append(url)
-
-                enumerator.skipDescendants()
-            }
-        }
-
-        return frameworks
     }
 
     // MARK: Directory Hash
 
     private static func directoryHash(
-        at root: URL
+        at directory: URL
     ) throws -> String {
 
         let manager = FileManager.default
 
-        let files = try collectFiles(at: root)
+        var entries: [(String, String)] = []
 
-        var hasher = SHA256()
+        func scan(
+            _ folder: URL,
+            relative: String
+        ) throws {
 
-        for item in files.sorted(
-            by: { $0.url.path < $1.url.path }
-        ) {
-
-            let relativePath = String(
-                item.url.path.dropFirst(root.path.count)
+            let items = try manager.contentsOfDirectory(
+                at: folder,
+                includingPropertiesForKeys: [
+                    .isDirectoryKey,
+                    .isSymbolicLinkKey
+                ],
+                options: []
             )
 
-            hasher.update(
-                data: Data(relativePath.utf8)
-            )
+            for item in items {
 
-            if item.isDirectory {
-                continue
+                let relativePath = relative.isEmpty
+                    ? item.lastPathComponent
+                    : relative + "/" + item.lastPathComponent
+
+                let values = try item.resourceValues(
+                    forKeys: [
+                        .isDirectoryKey,
+                        .isSymbolicLinkKey
+                    ]
+                )
+
+                if values.isSymbolicLink == true {
+
+                    let target = try manager.destinationOfSymbolicLink(
+                        atPath: item.path
+                    )
+
+                    entries.append(
+                        ("L:\(relativePath)", target)
+                    )
+
+                } else if values.isDirectory == true {
+
+                    entries.append(
+                        ("D:\(relativePath)", "")
+                    )
+
+                    try scan(
+                        item,
+                        relative: relativePath
+                    )
+
+                } else {
+
+                    let data = try Data(contentsOf: item)
+
+                    let digest = SHA256.hash(data: data)
+
+                    let hash = digest
+                        .map { String(format: "%02x", $0) }
+                        .joined()
+
+                    entries.append(
+                        ("F:\(relativePath)", hash)
+                    )
+                }
             }
-
-            let data = try Data(
-                contentsOf: item.url,
-                options: .mappedIfSafe
-            )
-
-            hasher.update(data: data)
         }
 
-        return hasher.finalize()
+        try scan(
+            directory,
+            relative: ""
+        )
+
+        let combined = entries
+            .sorted { $0.0 < $1.0 }
+            .map { "\($0.0)=\($0.1)" }
+            .joined(separator: "\n")
+
+        let digest = SHA256.hash(
+            data: Data(combined.utf8)
+        )
+
+        return digest
             .map { String(format: "%02x", $0) }
             .joined()
     }
