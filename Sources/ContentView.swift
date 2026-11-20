@@ -98,7 +98,7 @@ var body: some View {
 
                         NavigationLink(
                             destination: detailContent,
-                            tag: Optional(page),
+                            tag: page,
                             selection: $selectedPage
                         ) {
                             Label(page.rawValue, systemImage: page.icon)
@@ -413,7 +413,7 @@ var body: some View {
                 Image(systemName: filename == nil
                       ? "plus.circle"
                       : "checkmark.circle.fill")
-                    .foregroundStyle(filename == nil ? .secondary : .green)
+                    .foregroundColor(filename == nil ? .secondary : .green)
             }
             .contentShape(Rectangle())
         }
