@@ -1,7 +1,29 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum SignerPage: String, CaseIterable, Identifiable {
+    case source = "Framework"
+    case destination = "저장 위치"
+    case certificate = "인증서"
+    case signing = "서명 실행"
+    case logs = "작업 로그"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .source: return "shippingbox"
+        case .destination: return "folder.badge.checkmark"
+        case .certificate: return "key.horizontal"
+        case .signing: return "signature"
+        case .logs: return "terminal"
+        }
+    }
+}
+
 struct ContentView: View {
+
+    @State private var selectedPage: SignerPage? = .source
 
     @State private var sourceURL: URL?
     @State private var destinationURL: URL?
@@ -20,8 +42,7 @@ struct ContentView: View {
     @State private var showingP12Picker = false
 
     @State private var logs: [String] = [
-        "NX2Apple Signer 준비 완료",
-        "서명할 Framework를 선택해 주세요."
+        "NX2Apple Signer 준비 완료"
     ]
 
     @State private var successCount = 0
@@ -29,56 +50,35 @@ struct ContentView: View {
 
     var body: some View {
 
-        GeometryReader { geometry in
+        NavigationSplitView {
 
-            let isWide = geometry.size.width >= 700
+            List(selection: $selectedPage) {
 
-            ZStack {
+                Section("WORKSPACE") {
 
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
+                    ForEach(SignerPage.allCases) { page in
 
-                ScrollView {
-
-                    VStack(spacing: 20) {
-
-                        header
-
-                        if isWide {
-
-                            HStack(alignment: .top, spacing: 18) {
-
-                                VStack(spacing: 18) {
-                                    sourceSection
-                                    destinationSection
-                                }
-                                .frame(maxWidth: .infinity)
-
-                                VStack(spacing: 18) {
-                                    certificateSection
-                                    signingSection
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-
-                        } else {
-
-                            sourceSection
-                            destinationSection
-                            certificateSection
-                            signingSection
-                        }
-
-                        logSection
-
-                        footer
+                        Label(page.rawValue, systemImage: page.icon)
+                            .tag(Optional(page))
                     }
-                    .padding(isWide ? 24 : 16)
-                    .frame(maxWidth: 1100)
-                    .frame(maxWidth: .infinity)
                 }
             }
+            .listStyle(.sidebar)
+            .navigationTitle("NX2Apple")
+            .navigationSplitViewColumnWidth(
+                min: 170,
+                ideal: 210,
+                max: 260
+            )
+
+        } detail: {
+
+            detailContent
+                .navigationTitle(selectedPage?.rawValue ?? "NX2Apple Signer")
+                .navigationBarTitleDisplayMode(.inline)
         }
+        .navigationSplitViewStyle(.balanced)
+        .tint(.blue)
 
         .fileImporter(
             isPresented: $showingSourcePicker,
@@ -113,109 +113,125 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Header
+    private var detailContent: some View {
 
-    private var header: some View {
+        ScrollView {
 
-        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
 
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 34))
-                .foregroundStyle(.blue)
+                switch selectedPage ?? .source {
 
-            VStack(alignment: .leading, spacing: 4) {
+                case .source:
+                    sourceSection
 
-                Text("NX2Apple Signer")
-                    .font(.system(size: 27, weight: .bold))
+                case .destination:
+                    destinationSection
 
-                Text("Framework Signing Manager")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                case .certificate:
+                    certificateSection
+
+                case .signing:
+                    signingSection
+
+                case .logs:
+                    logSection
+                }
             }
-
-            Spacer()
-
-            Image(systemName: "iphone.gen3")
-                .font(.system(size: 25))
-                .foregroundStyle(.secondary)
+            .padding(16)
+            .frame(maxWidth: 900)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.vertical, 8)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
-    // MARK: - Source
+    // MARK: Framework
 
     private var sourceSection: some View {
 
-        card(title: "원본 Framework", icon: "folder.badge.plus") {
-
-            Text("서명할 Framework가 들어 있는 폴더를 선택합니다.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            pathLabel(sourceURL)
-
-            Button {
-                showingSourcePicker = true
-            } label: {
-                Label("원본 폴더 선택", systemImage: "folder")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    // MARK: - Destination
-
-    private var destinationSection: some View {
-
-        card(title: "저장 위치", icon: "folder.badge.checkmark") {
-
-            Text("서명이 완료된 Framework를 복사할 위치입니다.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            pathLabel(destinationURL)
-
-            Button {
-                showingDestinationPicker = true
-            } label: {
-                Label("저장 폴더 선택", systemImage: "folder")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-
-    // MARK: - Certificate
-
-    private var certificateSection: some View {
-
-        card(title: "인증서 설정", icon: "person.badge.key.fill") {
+        GroupBox {
 
             VStack(alignment: .leading, spacing: 12) {
 
-                Text("Provisioning Profile")
-                    .font(.subheadline.weight(.medium))
+                Text("서명할 Framework가 포함된 폴더를 선택합니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-                fileButton(
-                    title: "프로파일 선택",
-                    selected: profileURL != nil
+                pathLabel(sourceURL)
+
+                Button {
+                    showingSourcePicker = true
+                } label: {
+                    Label("원본 폴더 선택", systemImage: "folder")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        } label: {
+
+            Label("원본 Framework", systemImage: "shippingbox")
+                .font(.headline)
+        }
+    }
+
+    // MARK: Destination
+
+    private var destinationSection: some View {
+
+        GroupBox {
+
+            VStack(alignment: .leading, spacing: 12) {
+
+                Text("서명이 완료된 Framework를 저장할 위치입니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                pathLabel(destinationURL)
+
+                Button {
+                    showingDestinationPicker = true
+                } label: {
+                    Label("저장 폴더 선택", systemImage: "folder.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        } label: {
+
+            Label("저장 위치", systemImage: "folder.badge.checkmark")
+                .font(.headline)
+        }
+    }
+
+    // MARK: Certificate
+
+    private var certificateSection: some View {
+
+        GroupBox {
+
+            VStack(alignment: .leading, spacing: 14) {
+
+                fileSelectionRow(
+                    title: "Provisioning Profile",
+                    filename: profileURL?.lastPathComponent
                 ) {
                     showingProfilePicker = true
                 }
 
-                Text("P12 인증서")
-                    .font(.subheadline.weight(.medium))
+                Divider()
 
-                fileButton(
-                    title: "P12 파일 선택",
-                    selected: p12URL != nil
+                fileSelectionRow(
+                    title: "P12 인증서",
+                    filename: p12URL?.lastPathComponent
                 ) {
                     showingP12Picker = true
                 }
 
                 SecureField("P12 비밀번호", text: $password)
                     .textFieldStyle(.roundedBorder)
+
+                Divider()
 
                 Text("Host Bundle Identifier")
                     .font(.subheadline.weight(.medium))
@@ -228,134 +244,121 @@ struct ContentView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        } label: {
+
+            Label("인증서 설정", systemImage: "key.horizontal")
+                .font(.headline)
         }
     }
 
-    // MARK: - Signing
+    // MARK: Signing
 
     private var signingSection: some View {
 
-        card(title: "서명 실행", icon: "signature") {
+        GroupBox {
 
-            Toggle(
-                "실패한 작업용 복사본 자동 삭제",
-                isOn: $deleteFailedCopies
-            )
+            VStack(alignment: .leading, spacing: 16) {
 
-            HStack(spacing: 12) {
-
-                resultBox(
-                    title: "성공",
-                    value: successCount,
-                    color: .green
+                Toggle(
+                    "실패한 작업용 복사본 자동 삭제",
+                    isOn: $deleteFailedCopies
                 )
 
-                resultBox(
-                    title: "실패",
-                    value: failedCount,
-                    color: .red
-                )
-            }
+                HStack(spacing: 12) {
 
-            Button {
-                startSigning()
-            } label: {
+                    resultItem(
+                        title: "성공",
+                        value: successCount,
+                        color: .green
+                    )
 
-                HStack {
-
-                    if isSigning {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "checkmark.shield.fill")
-                    }
-
-                    Text(isSigning ? "서명 진행 중..." : "Framework 서명 시작")
-                        .fontWeight(.bold)
+                    resultItem(
+                        title: "실패",
+                        value: failedCount,
+                        color: .red
+                    )
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+
+                Button {
+                    startSigning()
+                } label: {
+
+                    Label(
+                        isSigning ? "서명 진행 중..." : "Framework 서명 시작",
+                        systemImage: "checkmark.shield"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isSigning || !canStartSigning)
+
+                if isSigning {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSigning || !canStartSigning)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        } label: {
+
+            Label("서명 실행", systemImage: "signature")
+                .font(.headline)
         }
     }
 
-    // MARK: - Logs
+    // MARK: Logs
 
     private var logSection: some View {
 
-        card(title: "작업 로그", icon: "terminal") {
+        GroupBox {
 
             ScrollView {
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
 
                     ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
 
-                        HStack(alignment: .top, spacing: 8) {
-
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.blue)
-
-                            Text(log)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                        }
+                        Text(log)
+                            .font(.system(size: 12, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(minHeight: 130, maxHeight: 220)
-        }
-    }
+            .frame(minHeight: 180, maxHeight: 450)
 
-    // MARK: - Footer
+        } label: {
 
-    private var footer: some View {
-
-        Text("NX2Apple Signer · Framework Signing Tool")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.vertical, 8)
-    }
-
-    // MARK: - Components
-
-    private func card<Content: View>(
-        title: String,
-        icon: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-
-        VStack(alignment: .leading, spacing: 16) {
-
-            Label(title, systemImage: icon)
+            Label("작업 로그", systemImage: "terminal")
                 .font(.headline)
-
-            content()
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
+
+    // MARK: Components
 
     private func pathLabel(_ url: URL?) -> some View {
 
-        Text(url?.lastPathComponent ?? "선택된 폴더가 없습니다.")
-            .font(.caption)
-            .foregroundStyle(url == nil ? .secondary : .primary)
-            .lineLimit(2)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+        HStack {
+
+            Image(systemName: "folder")
+                .foregroundStyle(.secondary)
+
+            Text(url?.lastPathComponent ?? "선택된 폴더 없음")
+                .font(.subheadline)
+                .lineLimit(2)
+
+            Spacer()
+        }
+        .padding(10)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func fileButton(
+    private func fileSelectionRow(
         title: String,
-        selected: Bool,
+        filename: String?,
         action: @escaping () -> Void
     ) -> some View {
 
@@ -363,45 +366,52 @@ struct ContentView: View {
 
             HStack {
 
-                Image(systemName: selected ? "checkmark.circle.fill" : "doc.badge.plus")
+                VStack(alignment: .leading, spacing: 4) {
 
-                Text(selected ? "파일 선택 완료" : title)
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+
+                    Text(filename ?? "파일을 선택해 주세요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
+                Image(systemName: filename == nil
+                      ? "plus.circle"
+                      : "checkmark.circle.fill")
+                    .foregroundStyle(filename == nil ? .secondary : .green)
             }
-            .font(.subheadline)
-            .padding(12)
-            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func resultBox(
+    private func resultItem(
         title: String,
         value: Int,
         color: Color
     ) -> some View {
 
-        VStack(spacing: 5) {
-
-            Text("\(value)")
-                .font(.title2.bold())
-                .foregroundStyle(color)
+        VStack(alignment: .leading, spacing: 4) {
 
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Text("\(value)")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(color)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color(uiColor: .tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    // MARK: - Validation
+    // MARK: Validation
 
     private var canStartSigning: Bool {
 
@@ -413,7 +423,7 @@ struct ContentView: View {
         !password.isEmpty
     }
 
-    // MARK: - File Selection
+    // MARK: File Selection
 
     private func handleFolderSelection(
         _ result: Result<[URL], Error>,
@@ -465,7 +475,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Signing
+    // MARK: Signing
 
     private func startSigning() {
 
@@ -482,7 +492,11 @@ struct ContentView: View {
         successCount = 0
         failedCount = 0
 
-        addLog("서명 작업을 시작합니다.")
+        addLog("서명 작업 시작")
+
+        let currentPassword = password
+        let currentBundleID = hostBundleIdentifier
+        let shouldDelete = deleteFailedCopies
 
         DispatchQueue.global(qos: .userInitiated).async {
 
@@ -493,9 +507,9 @@ struct ContentView: View {
                     destinationURL: destination,
                     profileURL: profile,
                     p12URL: p12,
-                    password: password,
-                    hostBundleIdentifier: hostBundleIdentifier,
-                    deleteFailedCopies: deleteFailedCopies
+                    password: currentPassword,
+                    hostBundleIdentifier: currentBundleID,
+                    deleteFailedCopies: shouldDelete
                 ) { message in
 
                     DispatchQueue.main.async {
@@ -528,6 +542,8 @@ struct ContentView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
 
-        logs.append("[\(formatter.string(from: Date()))] \(message)")
+        logs.append(
+            "[\(formatter.string(from: Date()))] \(message)"
+        )
     }
 }
