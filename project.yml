@@ -34,6 +34,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
         GENERATE_INFOPLIST_FILE: YES
+
         INFOPLIST_KEY_CFBundleDisplayName: NX2Apple Signer
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
 
