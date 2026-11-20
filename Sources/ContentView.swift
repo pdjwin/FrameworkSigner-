@@ -48,70 +48,101 @@ struct ContentView: View {
     @State private var successCount = 0
     @State private var failedCount = 0
 
-    var body: some View {
+var body: some View {
 
-        NavigationSplitView {
+    Group {
 
-            List(selection: $selectedPage) {
+        if #available(iOS 16.0, *) {
 
-                Section("WORKSPACE") {
+            NavigationSplitView {
+
+                List(selection: $selectedPage) {
+
+                    Section("WORKSPACE") {
+
+                        ForEach(SignerPage.allCases) { page in
+
+                            Label(
+                                page.rawValue,
+                                systemImage: page.icon
+                            )
+                            .tag(Optional(page))
+                        }
+                    }
+                }
+                .listStyle(.sidebar)
+                .navigationTitle("NX2Apple")
+                .navigationSplitViewColumnWidth(
+                    min: 170,
+                    ideal: 210,
+                    max: 260
+                )
+
+            } detail: {
+
+                detailContent
+                    .navigationTitle(
+                        selectedPage?.rawValue ?? "NX2Apple Signer"
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationSplitViewStyle(.balanced)
+
+        } else {
+
+            NavigationView {
+
+                List(selection: $selectedPage) {
 
                     ForEach(SignerPage.allCases) { page in
 
-                        Label(page.rawValue, systemImage: page.icon)
-                            .tag(Optional(page))
+                        NavigationLink(
+                            destination: detailContent,
+                            tag: Optional(page),
+                            selection: $selectedPage
+                        ) {
+                            Label(page.rawValue, systemImage: page.icon)
+                        }
                     }
                 }
+                .navigationTitle("NX2Apple")
             }
-            .listStyle(.sidebar)
-            .navigationTitle("NX2Apple")
-            .navigationSplitViewColumnWidth(
-                min: 170,
-                ideal: 210,
-                max: 260
-            )
-
-        } detail: {
-
-            detailContent
-                .navigationTitle(selectedPage?.rawValue ?? "NX2Apple Signer")
-                .navigationBarTitleDisplayMode(.inline)
-        }
-        .navigationSplitViewStyle(.balanced)
-        .tint(.blue)
-
-        .fileImporter(
-            isPresented: $showingSourcePicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            handleFolderSelection(result, isSource: true)
-        }
-
-        .fileImporter(
-            isPresented: $showingDestinationPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            handleFolderSelection(result, isSource: false)
-        }
-
-        .fileImporter(
-            isPresented: $showingProfilePicker,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false
-        ) { result in
-            handleFileSelection(result, isProfile: true)
-        }
-
-        .fileImporter(
-            isPresented: $showingP12Picker,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false
-        ) { result in
-            handleFileSelection(result, isProfile: false)
         }
     }
+    .tint(.blue)
+
+    .fileImporter(
+        isPresented: $showingSourcePicker,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false
+    ) { result in
+        handleFolderSelection(result, isSource: true)
+    }
+
+    .fileImporter(
+        isPresented: $showingDestinationPicker,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false
+    ) { result in
+        handleFolderSelection(result, isSource: false)
+    }
+
+    .fileImporter(
+        isPresented: $showingProfilePicker,
+        allowedContentTypes: [.data],
+        allowsMultipleSelection: false
+    ) { result in
+        handleFileSelection(result, isProfile: true)
+    }
+
+    .fileImporter(
+        isPresented: $showingP12Picker,
+        allowedContentTypes: [.data],
+        allowsMultipleSelection: false
+    ) { result in
+        handleFileSelection(result, isProfile: false)
+    }
+}
 
     private var detailContent: some View {
 
