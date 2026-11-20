@@ -32,9 +32,15 @@ jobs:
 
           sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
 
+          echo "=== Xcode Version ==="
+
           xcodebuild -version
 
+          echo "=== Available iOS SDK ==="
+
           xcodebuild -showsdks
+
+          echo "=== Verify iOS SDK ==="
 
           xcodebuild -version -sdk iphoneos27.2
 
@@ -86,8 +92,6 @@ jobs:
 
           test -f "$APP_PATH/Info.plist"
 
-          echo "Checking Files integration..."
-
           /usr/libexec/PlistBuddy \
             -c "Print :UIFileSharingEnabled" \
             "$APP_PATH/Info.plist"
@@ -96,7 +100,7 @@ jobs:
             -c "Print :LSSupportsOpeningDocumentsInPlace" \
             "$APP_PATH/Info.plist"
 
-          echo "Application verified."
+          echo "Application verification successful."
 
       - name: Package IPA
         run: |
@@ -122,13 +126,9 @@ jobs:
         uses: actions/upload-artifact@v4
 
         with:
-
           name: NX2AppleSigner-unsigned-IPA
-
           path: NX2AppleSigner-unsigned.ipa
-
           if-no-files-found: error
-
           retention-days: 14
 
       - name: Upload build log
@@ -137,11 +137,7 @@ jobs:
         uses: actions/upload-artifact@v4
 
         with:
-
           name: NX2AppleSigner-build-log
-
           path: build.log
-
           if-no-files-found: ignore
-
           retention-days: 7
