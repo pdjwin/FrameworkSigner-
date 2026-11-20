@@ -15,50 +15,33 @@ permissions:
   contents: read
 
 jobs:
-
   build:
-
     name: Build unsigned iOS IPA
 
     runs-on: xcode-27
 
     steps:
-
       - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Select Xcode 27.2
         run: |
-
           sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
 
-          echo "=== Xcode Version ==="
-
           xcodebuild -version
-
-          echo "=== Available iOS SDK ==="
-
           xcodebuild -showsdks
-
-          echo "=== Verify iOS SDK ==="
-
-          xcodebuild -version -sdk iphoneos27.2
 
       - name: Install XcodeGen
         run: |
-
           brew install xcodegen
-
           xcodegen --version
 
       - name: Generate Xcode project
         run: |
-
           xcodegen generate --spec project.yml
 
       - name: Resolve Swift packages
         run: |
-
           xcodebuild \
             -resolvePackageDependencies \
             -project NX2AppleSigner.xcodeproj \
@@ -66,7 +49,6 @@ jobs:
 
       - name: Build iOS application
         run: |
-
           set -o pipefail
 
           xcodebuild \
@@ -83,34 +65,46 @@ jobs:
 
       - name: Verify application
         run: |
-
           set -e
 
           APP_PATH="build/Build/Products/Release-iphoneos/NX2AppleSigner.app"
+          PLIST="$APP_PATH/Info.plist"
+
+          echo "Checking application..."
 
           test -d "$APP_PATH"
+          test -f "$PLIST"
 
-          test -f "$APP_PATH/Info.plist"
+          echo "Checking Files integration..."
 
-          /usr/libexec/PlistBuddy \
-            -c "Print :UIFileSharingEnabled" \
-            "$APP_PATH/Info.plist"
+          FILE_SHARING=$(/usr/libexec/PlistBuddy \
+            -c "Print :UIFileSharingEnabled" "$PLIST")
 
-          /usr/libexec/PlistBuddy \
-            -c "Print :LSSupportsOpeningDocumentsInPlace" \
-            "$APP_PATH/Info.plist"
+          OPEN_IN_PLACE=$(/usr/libexec/PlistBuddy \
+            -c "Print :LSSupportsOpeningDocumentsInPlace" "$PLIST")
 
-          echo "Application verification successful."
+          echo "UIFileSharingEnabled: $FILE_SHARING"
+          echo "LSSupportsOpeningDocumentsInPlace: $OPEN_IN_PLACE"
+
+          if [ "$FILE_SHARING" != "true" ]; then
+            echo "ERROR: UIFileSharingEnabled is not true."
+            exit 1
+          fi
+
+          if [ "$OPEN_IN_PLACE" != "true" ]; then
+            echo "ERROR: LSSupportsOpeningDocumentsInPlace is not true."
+            exit 1
+          fi
+
+          echo "Files integration verification successful."
 
       - name: Package IPA
         run: |
-
           set -e
 
           APP_PATH="build/Build/Products/Release-iphoneos/NX2AppleSigner.app"
 
           rm -rf Payload
-
           mkdir -p Payload
 
           cp -R "$APP_PATH" Payload/NX2AppleSigner.app
@@ -120,11 +114,10 @@ jobs:
           unzip -Z1 NX2AppleSigner-unsigned.ipa \
             | grep -q '^Payload/NX2AppleSigner.app/Info.plist$'
 
-          echo "IPA packaging verified."
+          echo "IPA packaging successful."
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
-
         with:
           name: NX2AppleSigner-unsigned-IPA
           path: NX2AppleSigner-unsigned.ipa
@@ -133,9 +126,7 @@ jobs:
 
       - name: Upload build log
         if: always()
-
         uses: actions/upload-artifact@v4
-
         with:
           name: NX2AppleSigner-build-log
           path: build.log
